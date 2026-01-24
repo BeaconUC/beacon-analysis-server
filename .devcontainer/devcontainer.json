@@ -1,0 +1,35 @@
+{
+    "name": "Beacon Analysis Server",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "beacon-analysis-server",
+    "workspaceFolder": "/workspace",
+    "mounts": [
+        "source=${localEnv:HOME}/.gitconfig,target=/home/debian/.gitconfig,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.ssh/id_ed25519,target=/home/debian/.ssh/id_ed25519,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.ssh/id_ed25519_signing,target=/home/debian/.ssh/id_ed25519_signing,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.ssh/id_ed25519_signing.pub,target=/home/debian/.ssh/id_ed25519_signing.pub,type=bind,consistency=cached"
+    ],
+    "forwardPorts": [3002],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "esbenp.prettier-vscode",
+                "oderwat.indent-rainbow",
+                "mhutchie.git-graph",
+                "eamodio.gitlens",
+                "charliermarsh.ruff"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "editor.formatOnSave": true
+            }
+        }
+    },
+    "portsAttributes": {
+        "3002": {
+            "label": "Beacon Analysis Server",
+            "onAutoForward": "notify"
+        }
+    },
+    "postCreateCommand": "pip install -r requirements.txt && playwright install --with-deps chromium"
+}
