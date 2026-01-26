@@ -58,7 +58,7 @@ create_environment:
 .PHONY: server
 server:
 	@echo ">>> Launching Beacon Analysis Server on port $(SERVER_PORT)..."
-	exec uv run uvicorn beacon_analysis_server.main:app --reload --host 0.0.0.0 --port $(SERVER_PORT)
+	uv run uvicorn beacon_analysis_server.main:app --reload --host 0.0.0.0 --port $(SERVER_PORT)
 
 
 
