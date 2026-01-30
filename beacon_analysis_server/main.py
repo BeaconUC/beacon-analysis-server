@@ -16,99 +16,21 @@ from spacy.language import Language
 import torch
 from transformers import TextClassificationPipeline, pipeline
 
-from beacon_analysis_server.config import MODELS_DIR
+from beacon_analysis_server.config import (
+    EXTENDED_STOP_WORDS,
+    MODELS_DIR,
+    # PHRASES,
+    RCA_TOP_N,
+    SENTIMENT_MAP,
+    # URGENCY_THRESHOLD,
+)
 
-torch.set_num_threads(1)
+STOP_PATTERN = re.compile(
+    r"\b(" + "|".join(map(re.escape, EXTENDED_STOP_WORDS)) + r")\b", re.IGNORECASE
+)
 
 RE_FLOOD = re.compile(r"(.)\1{2,}")
 RE_ADVERSARIAL = re.compile(r"[\._]+")
-SENTIMENT_MAP = {
-    "LABEL_0": ("Negative", -1),
-    "LABEL_1": ("Positive", 1),
-    "LABEL_2": ("Neutral", 0),
-}
-PHRASES = {
-    "EMERGENCY": [
-        "poste na tumba",
-        "putol na kawad",
-        "nagliliyab na transformer",
-        "may sumasabog",
-        "may nagliliyab",
-        "live wire",
-        "kawad sa kalsada",
-    ],
-    "TECHNICAL": [
-        "pumutok na transformer",
-        "walang kuryente",
-        "brownout pa rin",
-        "pumutok na kwan",
-        "spark sa poste",
-    ],
-    "FOLLOWUP": ["kanina pa", "update naman", "follow up ko lang", "gaano katagal"],
-}
-TECHNICAL_CANDIDATES = [
-    "transformer explosion",
-    "pumutok na transformer",
-    "fallen pole",
-    "poste na tumba",
-    "broken wire",
-    "putol na kawad",
-    "sparking wire",
-    "maintenance",
-    "overload",
-    "brownout",
-    "lightning strike",
-    "kidlat",
-    "short circuit",
-]
-TAGALOG_STOP_WORDS = [
-    "sa",
-    "ng",
-    "ang",
-    "mga",
-    "na",
-    "si",
-    "ni",
-    "ay",
-    "ito",
-    "sila",
-    "kami",
-    "kaming",
-    "ko",
-    "lang",
-    "dito",
-    "samin",
-    "po",
-    "opo",
-    "namin",
-    "inyo",
-    "inyong",
-    "ba",
-    "kasi",
-    "yung",
-    "kayo",
-    "mo",
-    "muna",
-    "naman",
-    "tapat",
-    "bahay",
-    "kalsada",
-    "kanto",
-    "paligid",
-    "baka",
-    "sana",
-    "paki",
-    "ngayon",
-    "kanina",
-    "mula",
-    "noon",
-    "diyan",
-    "dito",
-    "doon",
-    "ano",
-    "kwan",
-]
-EXTENDED_STOP_WORDS = list(ENGLISH_STOP_WORDS.union(TAGALOG_STOP_WORDS))
 
 
 class Report(BaseModel):
