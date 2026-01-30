@@ -3,7 +3,7 @@
 #################################################################################
 
 PROJECT_NAME = beacon_analysis_server
-PYTHON_VERSION = 3.14
+PYTHON_VERSION = 3.12
 PYTHON_INTERPRETER = python
 SERVER_PORT = 3002
 
@@ -13,8 +13,8 @@ SERVER_PORT = 3002
 
 
 ## Install Python dependencies
-.PHONY: requirements
-requirements:
+.PHONY: sync
+sync:
 	uv sync
 	
 

@@ -1,0 +1,142 @@
+[server]
+name    = "Beacon Analysis Server"
+version = "0.1.0"
+
+[sentiment.mapping]
+"LABEL_0" = ["Negative", -1]
+"LABEL_1" = ["Positive", 1]
+"LABEL_2" = ["Neutral", 0]
+
+[urgency]
+threshold = 85.0
+
+[urgency.phrases]
+EMERGENCY = [
+    "poste na tumba",
+    "putol na kawad",
+    "nagliliyab na transformer",
+    "may sumasabog",
+    "may nagliliyab",
+    "live wire",
+    "kawad sa kalsada",
+    "delikado",
+    "pasyente",
+    "medical",
+    "medical equipment",
+    "oxygen",
+    "life support",
+    "may sakit",
+    "kritikal",
+    "emergency",
+]
+TECHNICAL = [
+    "pumutok na transformer",
+    "walang kuryente",
+    "brownout pa rin",
+    "pumutok na kwan",
+    "spark sa poste",
+]
+FOLLOWUP = ["kanina pa", "update naman", "follow up ko lang", "gaano katagal"]
+
+[rca]
+diversity = 0.7
+top_n = 5
+candidates = [
+    # --- Supply & System ---
+    "Grid Supply Issue",
+    "Load Shedding",
+    "System Overload",
+    "Frequency Issue",
+    "Grid Sync Problem",
+
+    # --- Substation & Transmission ---
+    "Substation Failure",
+    "Transmission Fault",
+
+    # --- Distribution Network ---
+    "Transformer Failure",
+    "Blown Fuse",
+    "Breaker Trip",
+    "Primary Line Damage",
+    "Secondary Line Damage",
+
+    # --- Physical Infrastructure ---
+    "Fallen Pole",
+    "Leaning Pole",
+    "Cross-arm Damage",
+    "Insulator Flashover",
+    "Cable Fault",
+
+    # --- Weather & Environmental ---
+    "Weather Event",
+    "Lightning Damage",
+    "Flood Damage",
+    "Tree Interference",
+    "Animal Contact",
+
+    # --- Third-Party / Human ---
+    "Construction Damage",
+    "Vehicle Collision",
+    "Illegal Connection",
+    "Vandalism Theft",
+    "Fire Incident",
+
+    # --- Operations & Maintenance ---
+    "Scheduled Maintenance",
+    "Emergency Repair",
+    "Restoration Delay",
+
+    # --- Customer-Side ---
+    "Customer Wiring Issue",
+    "Meter Fault",
+]
+
+
+[language]
+tagalog_stop_words = [
+    "sa",
+    "ng",
+    "ang",
+    "mga",
+    "na",
+    "si",
+    "ni",
+    "ay",
+    "ito",
+    "sila",
+    "kami",
+    "kaming",
+    "ko",
+    "lang",
+    "dito",
+    "samin",
+    "po",
+    "opo",
+    "namin",
+    "inyo",
+    "inyong",
+    "ba",
+    "kasi",
+    "yung",
+    "kayo",
+    "mo",
+    "muna",
+    "naman",
+    "tapat",
+    "bahay",
+    "kalsada",
+    "kanto",
+    "paligid",
+    "baka",
+    "sana",
+    "paki",
+    "ngayon",
+    "kanina",
+    "mula",
+    "noon",
+    "diyan",
+    "dito",
+    "doon",
+    "ano",
+    "kwan",
+]
