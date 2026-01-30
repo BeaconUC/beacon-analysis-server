@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "beacon_analysis_server"
-version = "0.0.1"
+version = "0.3.0"
 description = "A data analysis service for Beacon"
 authors = [{ name = "Beacon" }]
 license = { file = "LICENSE" }

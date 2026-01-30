@@ -224,7 +224,7 @@ async def lifespan(app: FastAPI, models_dir=MODELS_DIR):
 
 app = FastAPI(
     title="Beacon Analysis Server",
-    version="0.2.0",
+    version="0.3.0",
     description="A FastAPI server serving Beacon analysis logic",
     lifespan=lifespan,
 )
