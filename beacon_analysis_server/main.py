@@ -3,7 +3,7 @@ from collections import Counter
 from contextlib import asynccontextmanager
 from functools import lru_cache
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from cleantext.clean import clean
 from fastapi import FastAPI, Request
@@ -11,68 +11,64 @@ from loguru import logger
 import onnxruntime as ort
 from optimum.onnxruntime import ORTModelForSequenceClassification
 from pydantic import BaseModel, Field
-
-# from rapidfuzz import fuzz, process
 from setfit import SetFitModel
 from transformers import (
     AutoTokenizer,
     pipeline,
 )
 
-from beacon_analysis_server.config import (
-    EXTENDED_STOP_WORDS,
-    MODELS_DIR,
-    # PHRASES,
-    RCA_TOP_N,
-    SENTIMENT_MAP,
-    # URGENCY_THRESHOLD,
-)
+from beacon_analysis_server.config import EXTENDED_STOP_WORDS, MODELS_DIR, RCA_TOP_N, SENTIMENT_MAP
 
 STOP_PATTERN = re.compile(
     r"\b(" + "|".join(map(re.escape, EXTENDED_STOP_WORDS)) + r")\b", re.IGNORECASE
 )
 
-RE_FLOOD = re.compile(r"(.)\1{2,}")
-RE_ADVERSARIAL = re.compile(r"[\._]+")
+RE_FLOOD = re.compile(r"(.)\1{2,}")  # matches 3 or more repeated characters
+RE_ADVERSARIAL = re.compile(r"[\._]+")  # matches sequences of . or _ characters
 
 
 class Report(BaseModel):
+    """
+    A user report containing a description of their issue.
+    """
+
     description: str = Field(..., min_length=3, max_length=500)
 
 
-class AnalysisResult(BaseModel):
+class Sentiment(BaseModel):
+    """
+    The sentiment analysis result for a user report.
+    """
+
     category: str
     confidence_score: float
 
 
-class BatchRCAInput(BaseModel):
+class ReportList(BaseModel):
+    """
+    A list of user report descriptions for batch processing.
+    """
+
     descriptions: list[str] = Field(..., min_length=1)
 
 
-class RCAIssue(BaseModel):
+class RCAItem(BaseModel):
+    """
+    An individual root cause analysis finding.
+    """
+
     root_cause: str
     confidence_score: float
 
 
 class RCASummary(BaseModel):
+    """
+    The summary of root cause analysis across a batch of reports.
+    """
+
     total_processed: int
     top_issue: str
-    top_findings: list[RCAIssue]
-
-
-def calculate_priority(intent_cat: Optional[str], cat_int: int, score: float) -> str:
-    """
-    Determines administrative priority based on sentiment and technical intent.
-    """
-    if intent_cat == "EMERGENCY":
-        return "CRITICAL"
-    if intent_cat == "TECHNICAL" or (cat_int == -1 and score > 0.9):
-        return "HIGH"
-    if intent_cat == "FOLLOW_UP" or cat_int == -1:
-        return "MEDIUM"
-    if cat_int == 1:
-        return "LOW (Feedback)"
-    return "ROUTINE"
+    top_findings: list[RCAItem]
 
 
 @lru_cache(maxsize=512)
@@ -83,6 +79,10 @@ def clean_report(
     stop_pattern=STOP_PATTERN,
     deep_clean=False,
 ) -> str:
+    """
+    Cleans the input text by removing stop words, normalizing characters, and reducing noise.
+    """
+
     logger.debug(f"[clean] Original text: {text}")
     if deep_clean:
         text = clean(
@@ -120,12 +120,16 @@ async def batch_processor(
     timeout: float = 1.0,
     sentiment_map: dict[str, tuple[str, int]] = SENTIMENT_MAP,
 ):
-    """Groups individual reports into batches for high-throughput inference."""
+    """
+    Groups individual reports into batches for high-throughput inference.
+    """
+
     while True:
-        batch: list[tuple[str, asyncio.Future[AnalysisResult]]] = list()
+        batch: list[tuple[str, asyncio.Future[Sentiment]]] = list()
         item = await queue.get()
         batch.append(item)
 
+        # Gather more items up to batch_size or until timeout
         end_time = asyncio.get_event_loop().time() + timeout
         while len(batch) < batch_size:
             wait_time = end_time - asyncio.get_event_loop().time()
@@ -155,7 +159,7 @@ async def batch_processor(
 
             if not future.done():
                 future.set_result(
-                    AnalysisResult(
+                    Sentiment(
                         category=cat_str,
                         confidence_score=score,
                     )
@@ -169,6 +173,10 @@ def make_pipeline(
     batch_size: int,
     pipeline_name: Any,
 ):
+    """
+    Creates a text classification pipeline using the specified model and tokenizer.
+    """
+
     model = ORTModelForSequenceClassification.from_pretrained(
         id, file_name=model_name, local_files_only=True, session_options=session_options
     )
@@ -184,7 +192,11 @@ def make_pipeline(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI, models_dir=MODELS_DIR):
-    queue: asyncio.Queue[tuple[str, asyncio.Future[AnalysisResult]]] = asyncio.Queue()
+    """
+    Manages the lifespan of the FastAPI application, including setup and teardown of resources.
+    """
+
+    queue: asyncio.Queue[tuple[str, asyncio.Future[Sentiment]]] = asyncio.Queue()
 
     sess_options = ort.SessionOptions()
     sess_options.intra_op_num_threads = 4
@@ -220,15 +232,19 @@ app = FastAPI(
 
 @app.get("/")
 async def root():
+    """
+    Health check endpoint to verify the server is running.
+    """
+
     return {"message": "Beacon Analysis Server is online"}
 
 
-@app.post("/reports/sentiment", response_model=AnalysisResult)
+@app.post("/reports/sentiment", response_model=Sentiment)
 async def run_analysis(report: Report, request: Request):
     """
     Analyzes a single description from a user report and returns the sentiment (NEGATIVE, NEUTRAL, POSITIVE) and confidence.
     """
-    future: asyncio.Future[AnalysisResult] = asyncio.get_running_loop().create_future()
+    future: asyncio.Future[Sentiment] = asyncio.get_running_loop().create_future()
     report_queue: asyncio.Queue = request.app.state.report_queue
     await report_queue.put((report.description, future))
 
@@ -239,7 +255,7 @@ async def run_analysis(report: Report, request: Request):
 
 
 @app.post("/reports/batch/rca", response_model=RCASummary)
-async def run_batch_rca(data: BatchRCAInput, request: Request):
+async def run_batch_rca(data: ReportList, request: Request):
     """
     Analyzes a collection of reports to identify the underlying
     failure or root cause across the batch.
@@ -247,14 +263,13 @@ async def run_batch_rca(data: BatchRCAInput, request: Request):
     model: SetFitModel = request.app.state.rca_model
 
     cleaned = [clean_report(r) for r in data.descriptions]
-
     predictions: list[str] = cast(list[str], model(cleaned))
 
     label_counts = Counter(predictions)
     sorted_labels = label_counts.most_common(RCA_TOP_N)
 
     top_findings = [
-        RCAIssue(
+        RCAItem(
             root_cause=label,
             confidence_score=round(count / len(cleaned), 4),
         )
