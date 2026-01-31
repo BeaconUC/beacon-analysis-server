@@ -10,11 +10,6 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ..:/workspace:cached
-      - ../.kaggle:/workspace/.kaggle:ro
-      - vscode-extension:/root/.vscode-server-insiders
     command: sleep infinity
     networks:
       - beacon-dev
-
-volumes:
-  vscode-extension:
