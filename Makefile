@@ -61,6 +61,10 @@ server:
 	uv run uvicorn beacon_analysis_server.main:app --reload --host 0.0.0.0 --port $(SERVER_PORT)
 
 
+.PHONY: models
+models:
+	hf download jmrec/beacon-uc --include roberta_sentiment_custom/* --local-dir models
+	hf download jmrec/beacon-uc --include setfit_v2/* --local-dir models
 
 #################################################################################
 # PROJECT RULES                                                                 #
