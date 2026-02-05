@@ -18,6 +18,7 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && apt-get install -y --no-install-recommends \
     build-essential \
     openssh-client \
+    sudo \
     curl \
     git \
     tini \
