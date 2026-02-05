@@ -7,6 +7,7 @@ from typing import Any, cast
 
 from cleantext.clean import clean
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 import onnxruntime as ort
 from optimum.onnxruntime import ORTModelForSequenceClassification
@@ -19,6 +20,7 @@ from transformers import (
 
 from beacon_analysis_server.config import EXTENDED_STOP_WORDS, MODELS_DIR, RCA_TOP_N, SENTIMENT_MAP
 
+# Stop patterns are words in text that don't add significant meaning
 STOP_PATTERN = re.compile(
     r"\b(" + "|".join(map(re.escape, EXTENDED_STOP_WORDS)) + r")\b", re.IGNORECASE
 )
@@ -82,7 +84,7 @@ def clean_report(
     """
     Cleans the input text by removing stop words, normalizing characters, and reducing noise.
     """
-
+    # Deep cleaning if specified
     logger.debug(f"[clean] Original text: {text}")
     if deep_clean:
         text = clean(
@@ -102,11 +104,13 @@ def clean_report(
         )
         text = stop_pattern.sub("", text)
 
-    # soooooo / !!!!! / hahahahaha
+    # Reduce character flooding
+    # e.g., soooooo / !!!!! / hahahahaha
     text = re_flood.sub(r"\1", text)
     logger.debug(f"[clean] Scrubbed: {text}")
 
-    # sh_t / wala.naman kuryente...
+    # Remove adversarial characters
+    # e.g., sh_t / wala.naman kuryente...
     text = re_adversarial.sub("", text)
     logger.debug(f"[clean] New scrubbed: {text}")
 
@@ -123,8 +127,9 @@ async def batch_processor(
     """
     Groups individual reports into batches for high-throughput inference.
     """
-
+    # Continuously process incoming reports
     while True:
+        # Collect a batch of items
         batch: list[tuple[str, asyncio.Future[Sentiment]]] = list()
         item = await queue.get()
         batch.append(item)
@@ -141,11 +146,14 @@ async def batch_processor(
             except asyncio.TimeoutError:
                 break
 
+        # Process the batch
         raw_texts = [b[0] for b in batch]
         clean_texts = [clean_report(text) for text in raw_texts]
 
+        # Run inference using the pipeline
         results = pipeline(clean_texts)
 
+        # Map results back to individual futures
         logger.debug(f"Raw Output: {results}")
         for i, (_, future) in enumerate(batch):
             if i >= len(results):
@@ -176,11 +184,15 @@ def make_pipeline(
     """
     Creates a text classification pipeline using the specified model and tokenizer.
     """
-
+    # Load the ONNX model for sequence classification
     model = ORTModelForSequenceClassification.from_pretrained(
         id, file_name=model_name, local_files_only=True, session_options=session_options
     )
+
+    # Load the tokenizer
     tokenizer = AutoTokenizer.from_pretrained(id, file_name=model_name, fix_mistral_regex=True)
+
+    # Create the text classification pipeline
     return pipeline(
         pipeline_name,
         model=cast(Any, model),
@@ -195,14 +207,16 @@ async def lifespan(app: FastAPI, models_dir=MODELS_DIR):
     """
     Manages the lifespan of the FastAPI application, including setup and teardown of resources.
     """
-
+    # Initialize the report processing queue
     queue: asyncio.Queue[tuple[str, asyncio.Future[Sentiment]]] = asyncio.Queue()
 
+    # Configure ONNX Runtime session options
     sess_options = ort.SessionOptions()
     sess_options.intra_op_num_threads = 4
     sess_options.inter_op_num_threads = 4
     sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
+    # Load the RoBERTa sentiment analysis model pipeline
     roberta_classifier = make_pipeline(
         id=f"{models_dir}/roberta_sentiment_custom/",
         model_name="model.onnx",
@@ -211,43 +225,68 @@ async def lifespan(app: FastAPI, models_dir=MODELS_DIR):
         pipeline_name="text-classification",
     )
 
+    # Load the SetFit RCA model
     rca_model = SetFitModel.from_pretrained(f"{models_dir}/setfit_v2", local_files_only=True)
 
+    # Store resources in application state
     app.state.report_queue = queue
     app.state.roberta_classifier = roberta_classifier
     app.state.rca_model = rca_model
 
+    # Start the batch processor task
     processor_task = asyncio.create_task(batch_processor(queue, roberta_classifier))
     yield
     processor_task.cancel()
 
 
+# Initialize FastAPI application
 app = FastAPI(
     title="Beacon Analysis Server",
     version="0.3.0",
-    description="A FastAPI server serving Beacon analysis logic",
+    description="A FastAPI server for analyzing user reports using NLP models.",
     lifespan=lifespan,
+)
+
+origins = [
+    "https://iankyrilcarino.github.io",
+    "http://127.0.0.1:5502",
+    "http://localhost:5502",
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+    "http://127.0.0.1",
+    "http://localhost",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
 @app.get("/")
 async def root():
     """
-    Health check endpoint to verify the server is running.
+    Endpoint to verify the server is running.
     """
-
-    return {"message": "Beacon Analysis Server is online"}
+    return {"message": "online!"}
 
 
 @app.post("/reports/sentiment", response_model=Sentiment)
 async def run_analysis(report: Report, request: Request):
     """
-    Analyzes a single description from a user report and returns the sentiment (NEGATIVE, NEUTRAL, POSITIVE) and confidence.
+    Analyzes a single description from a user report and returns the sentiment (NEGATIVE, NEUTRAL, POSITIVE) and confidence score.
     """
+    # Create a future to hold the result
     future: asyncio.Future[Sentiment] = asyncio.get_running_loop().create_future()
+
+    # Put the report description and future into the queue for processing
     report_queue: asyncio.Queue = request.app.state.report_queue
     await report_queue.put((report.description, future))
 
+    # Wait for the result
     result = await future
     logger.debug(f"Result for '{report.description}': {result}")
 
@@ -260,11 +299,14 @@ async def run_batch_rca(data: ReportList, request: Request):
     Analyzes a collection of reports to identify the underlying
     failure or root cause across the batch.
     """
+    # Load the RCA model from the application state
     model: SetFitModel = request.app.state.rca_model
 
+    # Clean the reports before analysis
     cleaned = [clean_report(r) for r in data.descriptions]
     predictions: list[str] = cast(list[str], model(cleaned))
 
+    # Aggregate and rank the root cause findings
     label_counts = Counter(predictions)
     sorted_labels = label_counts.most_common(RCA_TOP_N)
 
