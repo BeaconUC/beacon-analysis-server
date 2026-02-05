@@ -2,13 +2,13 @@ FROM python:3.12-slim-trixie
 
 ARG USERNAME=vscode \
     USER_UID=1000 \
-    USER_GID=$USER_UID
+    USER_GID=1000
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     KAGGLE_CONFIG_DIR=/workspace \
-    APP_HOME=/app
+    APP_HOME=/workspace
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
