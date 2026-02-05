@@ -13,3 +13,9 @@ services:
     command: sleep infinity
     networks:
       - beacon-dev
+
+volumes:
+  vscode_extensions:
+    external: true
+  vscode_data:
+    external: true

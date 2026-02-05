@@ -3,10 +3,15 @@
     "dockerComposeFile": "docker-compose.yml",
     "service": "beacon-analysis-server",
     "workspaceFolder": "/workspace",
+    "remoteUser": "vscode",
+    "updateRemoteUserUID": true,
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {}
+    },
     "mounts": [
-        "source=vscode_extensions,target=/home/debian/.vscode-server/extensions,type=volume",
-        "source=vscode_data,target=/home/debian/.vscode-server/data,type=volume",
-        "source=${localEnv:HOME}/.ssh/id_ed25519_signing.pub,target=/home/debian/.ssh/id_ed25519_signing.pub,type=bind,consistency=cached"
+        "source=vscode_extensions,target=/home/vscode/.vscode-server/extensions,type=volume",
+        "source=vscode_data,target=/home/vscode/.vscode-server/data,type=volume",
+        "source=${localEnv:HOME}/.ssh/id_ed25519_signing.pub,target=/home/vscode/.ssh/id_ed25519_signing.pub,type=bind,consistency=cached"
     ],
     "forwardPorts": [3002],
     "customizations": {
@@ -30,5 +35,5 @@
             "onAutoForward": "notify"
         }
     },
-    "postCreateCommand": "git config --global gpg.format ssh && git config --global user.signingkey \"key:$(cat /home/debian/.ssh/id_ed25519_signing.pub)\" && git config --global commit.gpgsign true"
+    "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode && git config --global gpg.format ssh && git config --global user.signingkey /home/vscode/.ssh/id_ed25519_signing.pub && git config --global commit.gpgsign true"
 }
