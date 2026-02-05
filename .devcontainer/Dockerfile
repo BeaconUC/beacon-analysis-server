@@ -21,6 +21,7 @@ RUN groupadd --gid $USER_GID $USERNAME \
     sudo \
     curl \
     git \
+    screen \
     tini \
     tree \
     vim \
